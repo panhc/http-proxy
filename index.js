@@ -77,7 +77,7 @@ class HttpProxy {
             return await fn();
         } catch (error) {
             console.log('代理重试中');
-            return await protection(fn);
+            return await this.protection(fn);
         }
     }
 }
