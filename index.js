@@ -19,7 +19,7 @@ class HttpProxy {
 
     async init() {
         console.log('代理抓取中');
-        setTimeout(this.init, 5 * 60 * 1000);
+        setTimeout(this.init.bind(this), 5 * 60 * 1000);
         await this.crawlProxy();
         // 验证代理
         let p = [];
