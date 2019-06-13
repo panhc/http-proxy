@@ -3,12 +3,11 @@ const HttpProxy = require('./index');
 
 async function main() {
     let proxy = new HttpProxy('http');
-    await proxy.init();
     let res = await proxy.protection(async () => {
-        let ip = proxy.getIP();
+        let ip = await proxy.getIP();
         return await getBaidu(ip);
     });
-    console.log(res);
+    console.log(res.data);
 }
 
 async function getBaidu(ip) {

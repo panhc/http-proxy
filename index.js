@@ -1,74 +1,88 @@
 
 const axios = require('axios');
+const request = require('request');
 const cheerio = require('cheerio');
+
+function sleep(time) {
+    return new Promise(reslove => setTimeout(reslove, time));
+};
 
 class HttpProxy {
     constructor(protocol) {
         this.pool = []; // 代理池
         this.ips = [];
         this.proxyUrl = {
-            http: 'https://www.xicidaili.com/nn',
-            https: 'https://www.xicidaili.com/wn'
+            http: 'http://www.xiladaili.com/http/',
+            https: 'http://www.xiladaili.com/https/'
         }[protocol];
         this.validteUrl = {
             http: 'http://baidu.com',
             https: 'https://www.baidu.com/'
         }[protocol]
         this.protocol = protocol;
+        this.used = null;  // 当前被使用的ip
     }
 
-    async init() {
-        console.log('代理抓取中');
-        setTimeout(this.init.bind(this), 5 * 60 * 1000);
+    async main() {
+        console.log('代理抓取中-------------');
         await this.crawlProxy();
         // 验证代理
         let p = [];
+        this.pool = [];
         for (let index = 0; index < this.ips.length; index++) {
             let ip = this.ips[index];
             p.push(this.validte(ip));
         }
         await Promise.all(p);
-        console.log('代理抓取结束');
+        console.log('代理抓取结束-------------');
     }
 
     async crawlProxy() {
-        const { data } = await axios.get(this.proxyUrl);
+        let page = Math.ceil(Math.random() * 1999) + 1;
+        const { data } = await axios.get(this.proxyUrl + page);
         let $ = cheerio.load(data);
         let ips = [];
-        $('#ip_list tr').each((index, item) => {
+
+        $('.fl-table tr').each((index, item) => {
             if (index === 0) return;
             let tds = $(item).find('td');
             let ip = {};
-            ip.host = tds.eq(1).text();
-            ip.port = tds.eq(2).text();
+            let text = tds.eq(0).text().split(':');
+            ip.host = text[0];
+            ip.port = text[1];
             ips.push(ip);
         });
         this.ips = ips;
     }
 
     async validte(ip) {
-        try {
-            await axios.get(this.validteUrl, {
-                timeout: 500,
-                proxy: {
-                    host: ip.host,
-                    port: ip.port,
-                },
-            })
-            console.log(ip);
-            this.pool.push(ip);
-        } catch (e) {
-
-        }
+        return new Promise(reslove => {
+            try {
+                let _request = request.defaults({ proxy: `${this.protocol}://${ip.host}:${ip.port}` });
+                _request.get(this.validteUrl, { timeout: 3000 }, (err, res) => {
+                    if (!err) {
+                        console.log(ip);
+                        this.pool.push(ip);
+                        // console.log(res);
+                    }
+                    reslove();
+                });
+            } catch (e) {
+                reslove();
+            }
+        });
     }
 
-    getIP() {
+    async getIP() {
         if (this.pool.length > 0) {
+            console.log('代理池中剩余', this.pool.length);
             let random = Math.ceil(Math.random() * this.pool.length - 1);
             console.log('代理随机数', random);
+            this.used = random;
             return this.pool[random];
         } else {
-            return null;
+            await this.main();
+            return await this.getIP();
         }
     }
 
@@ -77,6 +91,8 @@ class HttpProxy {
             return await fn();
         } catch (error) {
             console.log('代理重试中');
+            this.pool.splice(this.used, 1);
+            await sleep(1000);
             return await this.protection(fn);
         }
     }
